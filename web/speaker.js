@@ -3,6 +3,8 @@
 const KEY = 'care-voice';
 // A little slower than normal by default: easier to follow on a recording.
 const RATE = 0.9;
+// The assistant's own short introduction; the video's first scene plays it with "Try voice".
+export const INTRO = "I'm not here to replace anyone. I just keep the family's words, so nobody has to remember alone. From here, let me show you.";
 const $ = id => document.getElementById(id);
 
 export function loadChoice(fallback) {
@@ -44,7 +46,7 @@ export function setupSpeaker(polly) {
   };
   for (const el of [pick, $('rate'), $('pitch')]) el.onchange = sync;
   sync();
-  $('tryVoice').onclick = () => speakWith(choice, "I'm not here to replace anyone. I just keep the family's words.");
+  $('tryVoice').onclick = () => speakWith(choice, INTRO);
   return text => speakWith(choice, text);
 }
 
