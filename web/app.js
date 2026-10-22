@@ -3,6 +3,7 @@
 // /api/understand, so no cloud key ever reaches the page.
 import { sayLogged, sayStatus, sayHandoff, sayForgot, sayTentative, cite } from './voice.js';
 import { scrubNodes } from './scrub.js';
+import { setupSpeaker } from './speaker.js';
 
 const PROTOCOL = '2025-11-25';
 const $ = id => document.getElementById(id);
@@ -70,12 +71,9 @@ function bubble(kind, who, text, extra = '') {
   div.scrollTop = 0; $('chat').scrollTop = $('chat').scrollHeight;
 }
 
+let say = () => {};
 function speak(text) {
-  if (!$('speakOut').checked || !('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/"/g, ''));
-  u.lang = 'en-US'; u.rate = 1.0;
-  speechSynthesis.speak(u);
+  if ($('speakOut').checked) Promise.resolve(say(text)).catch(() => {});
 }
 
 function answer(text, extra) { bubble('alexa', 'Alexa', text, extra); speak(text); }
@@ -218,6 +216,7 @@ function setupMic(submit) {
 async function main() {
   const cfg = await (await fetch('/api/config')).json();
   $('brain').textContent = `brain: ${cfg.brain}`;
+  say = setupSpeaker(cfg.polly);
   $('clock').value = toLocalInput(new Date());
   for (const b of document.querySelectorAll('[data-time]')) b.onclick = () => setClock(b.dataset.time);
 

@@ -167,3 +167,15 @@ test('11: product feedback draft exists with every section', () => {
   const fb = fs.readFileSync(new URL('../docs/product-feedback.md', import.meta.url), 'utf8');
   for (const h of ['Used for', 'Worked well', 'Could be better', 'Onboarding', 'Would use again']) assert.match(fb, new RegExp(h));
 });
+
+test('voice: /speak refuses an unknown voice and /api/config lists the Polly candidates', async () => {
+  await withServer(async url => {
+    const cfg = await (await fetch(`${url}/api/config`)).json();
+    assert.deepEqual(cfg.polly.voices, ['Joanna', 'Ruth', 'Danielle', 'Matthew', 'Stephen']);
+    assert.ok(['Joanna', 'Ruth'].includes(cfg.polly.default));
+    const bad = await fetch(`${url}/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'hi', voice: 'Nobody' }) });
+    assert.equal(bad.status, 400);
+    const empty = await fetch(`${url}/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: '' }) });
+    assert.equal(empty.status, 400);
+  });
+});

@@ -19,6 +19,14 @@ Output, 2026-10-22, copied as printed:
 - `engine` starts with `bedrock:` only when the model answered; on any failure it falls back and says `rules`.
 - Claude Haiku 4.5 on Bedrock only reads the sentence. Whether a record is a repeat, a conflict, or the answer itself is computed by code from stored events.
 
+## Amazon Polly — ran (read-aloud voice)
+
+`POST /speak` → `src/speak.js` → Polly `SynthesizeSpeech` (neural, en-US, mp3). Listening set: `node --env-file-if-exists=.env scripts/voice-samples.mjs`, one line per voice, 2026-10-22, e.g.:
+
+```json
+{"when":"2026-10-22T14:01:37.654Z","region":"us-east-1","service":"polly","engine":"neural","voice":"Joanna","files":3,"bytes":227364,"ms":3320}
+```
+
 ## Amazon DynamoDB — optional, not deployed
 
 `src/store/dynamo.js` is written (append with `attribute_not_exists(seq)`; on a clash the ledger re-reads, re-checks and retries), but **no table was created and it was not run for this submission**. The demo and the default `npm start` use the local JSON-lines store. Turn it on with `CARE_STORE=dynamo` after creating the table described in the README.

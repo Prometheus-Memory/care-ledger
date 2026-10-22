@@ -1,6 +1,7 @@
 // One small Node server:
 //   POST /mcp           MCP over Streamable HTTP (stateless, JSON responses)
 //   POST /api/understand  sentence -> intent (Bedrock if configured, rules otherwise); keys stay here
+//   POST /speak         text -> Amazon Polly neural mp3 (read-aloud voice); keys stay here
 //   GET  /               the web simulator
 import http from 'node:http';
 import fs from 'node:fs';
@@ -11,6 +12,7 @@ import { Ledger } from './ledger.js';
 import { JsonStore } from './store/json.js';
 import { buildMcpServer } from './mcp.js';
 import { understand } from './brain.js';
+import { synthesize, POLLY_VOICES, DEFAULT_VOICE } from './speak.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -63,8 +65,9 @@ export function createApp(ledger) {
         return json(res, 200, await understand(String(text || '')));
       }
       if (url.pathname === '/api/config') {
-        return json(res, 200, { brain: process.env.BEDROCK_MODEL_ID ? 'bedrock' : 'rules' });
+        return json(res, 200, { brain: process.env.BEDROCK_MODEL_ID ? 'bedrock' : 'rules', polly: { voices: POLLY_VOICES, default: DEFAULT_VOICE } });
       }
+      if (url.pathname === '/speak' && req.method === 'POST') return await handleSpeak(req, res);
       if (req.method === 'GET') return serveStatic(url.pathname, res);
       json(res, 404, { error: 'not found' });
     } catch (err) {
@@ -72,6 +75,19 @@ export function createApp(ledger) {
       if (!res.headersSent) json(res, 500, { error: err.message });
     }
   };
+}
+
+async function handleSpeak(req, res) {
+  const { text, voice } = JSON.parse(await readBody(req) || '{}');
+  try {
+    const mp3 = await synthesize(text, voice || DEFAULT_VOICE);
+    res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' }).end(mp3);
+  } catch (err) {
+    // Only the error name goes out or into the log: never keys, account ids or the raw AWS message.
+    if (err.status === 400) return json(res, 400, { error: err.message });
+    console.error('polly:', err.name);
+    json(res, 502, { error: 'polly unavailable', code: err.name });
+  }
 }
 
 async function handleMcp(ledger, req, res) {

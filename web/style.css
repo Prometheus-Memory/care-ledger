@@ -37,3 +37,5 @@ form#say { display: flex; gap: 8px; } form#say input { flex: 1; min-width: 0; }
 .log li { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; }
 .log .dir { color: var(--accent); font-weight: 700; }
 footer { color: var(--muted); font-size: 13px; }
+.voicebar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.voicebar select { max-width: 220px; }
