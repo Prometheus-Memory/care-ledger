@@ -56,6 +56,15 @@ npm start
 
 Open http://127.0.0.1:8787. The server listens on loopback only (`CARE_HOST` to change). Use the time buttons (8:04 AM · 7:10 PM · Next day 9 AM) to move the simulated clock, pick who is talking, then type or press 🎤.
 
+### Recording the demo
+
+With the server running in another window (`npm start`), `npm run demo:play` opens its own browser window (1600×900, sound on), resets and seeds the local ledger, sets "Read answers aloud", Joanna and speed 0.9, waits for Enter, then plays every app scene of `DEMO_SCRIPT.md` by itself: it types each line, waits until Alexa has finished speaking, and moves on. Add `-- --captions` to show each scene's caption line. On Windows PowerShell, where `npm.ps1` is blocked, run:
+
+```
+npm.cmd start
+npm.cmd run demo:play
+```
+
 Try:
 1. *Minji, 8:04 AM:* "I gave Dad his blood pressure pill"
 2. *Joon, 7:10 PM:* "Did Dad take his blood pressure pill?" → answer with source

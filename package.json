@@ -7,7 +7,8 @@
     "start": "node --env-file-if-exists=.env src/server.js",
     "test": "node --test",
     "seed:demo": "node --env-file-if-exists=.env scripts/demo-data.mjs seed",
-    "reset:demo": "node --env-file-if-exists=.env scripts/demo-data.mjs reset"
+    "reset:demo": "node --env-file-if-exists=.env scripts/demo-data.mjs reset",
+    "demo:play": "node --env-file-if-exists=.env scripts/demo-play.mjs"
   },
   "license": "MIT",
   "type": "module",
@@ -21,5 +22,8 @@
   },
   "engines": {
     "node": ">=22.9"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.55.0"
   }
 }
