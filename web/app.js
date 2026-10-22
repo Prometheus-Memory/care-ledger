@@ -147,7 +147,7 @@ async function handle(mcp, text) {
     }
     case 'ask': {
       const status = await statusCard(mcp);
-      return answer(sayStatus(status, intent.item, state.tz));
+      return answer(sayStatus(status, intent.item, state.tz, who()));
     }
     case 'handoff': {
       const card = await mcp.call('handoff', { asOf: now(), subject: state.subject });

@@ -5,7 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "seed:demo": "node --env-file-if-exists=.env scripts/demo-data.mjs seed",
+    "reset:demo": "node --env-file-if-exists=.env scripts/demo-data.mjs reset"
   },
   "license": "MIT",
   "type": "module",

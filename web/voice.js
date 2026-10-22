@@ -1,8 +1,40 @@
 // What the assistant says back. Warm and short; every factual answer ends with its evidence
 // (who, when, their words). When people disagree it says both and asks. It never gives medical advice.
 
+// The voice, fixed in one place: a friendly extra helper next to the family, never a stand-in for one of them.
+// The same lines go to the Bedrock prompt (src/brain.js), and the tests run every reply through breaksTone().
+export const TONE = [
+  'Short: one or two plain sentences.',
+  'Kind, but not sugary: no pet names, no gushing.',
+  'Fact first, then who said it, when, and their words.',
+  'Judgment stays with the people: ask, and say "Your call." when they decide.',
+  'Never speak as a family member, never pretend to feel, never give medical advice.',
+];
+
+const OFF_TONE = [
+  /\b(honey|sweetie|sweetheart|darling|dear)\b/i, // pet names
+  /\bI (love|miss) you\b/i, /\bI('m| am) (so )?(sad|proud|worried|scared|heartbroken)\b/i, /\bI feel\b/i, // acted feelings
+  /\b(as|like) (your|a) (mom|mother|dad|father|daughter|son|family member)\b/i, /\bI('m| am) (your|her|his) (mom|mother|dad|father|daughter|son)\b/i,
+  /\b(you should|it's (safe|fine|okay) to|go ahead and) (take|give|double|skip|stop|increase|lower)\b/i, // advice
+  /\b(safe|unsafe|dangerous) (dose|dosage|amount)\b/i, /\bdosage\b/i,
+];
+
+export function breaksTone(text) {
+  return OFF_TONE.some(re => re.test(text));
+}
+
 export function clock(iso, tz) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
+}
+
+const PRONOUN = { Mom: 'She', Grandma: 'She', Dad: 'He', Grandpa: 'He' };
+
+function partOfDay(iso, asOf, tz) {
+  const day = d => new Date(d).toLocaleDateString('en-US', { timeZone: tz });
+  const h = Number(new Date(iso).toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: tz })) % 24;
+  const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
+  if (asOf && day(iso) === day(asOf)) return part === 'night' ? 'tonight' : `this ${part}`;
+  return `on ${new Date(iso).toLocaleDateString('en-US', { weekday: 'long', timeZone: tz })}`;
 }
 
 export function cite(ev, tz) {
@@ -19,7 +51,7 @@ export function sayLogged(res, tz) {
   if (res.needsConfirmation) {
     const p = res.check.previous;
     return `Just a heads-up — ${p.item} is already in the log as given. ${cite(p, tz)}. `
-      + `Could you double-check it wasn't already given? Want me to record another one anyway? You decide.`;
+      + `Could you double-check it wasn't already given? Want me to record another one anyway? Your call.`;
   }
   const e = res.event;
   if (e.override) return `Okay, I've noted a second ${e.item} at your say-so. I'll flag it for whoever's next.`;
@@ -40,7 +72,8 @@ export function sayTentative(intent) {
     + `Did ${whom} already have it? Say "yes" and I'll note it just as you said it.`;
 }
 
-export function sayStatus(status, item, tz) {
+// asker: who is asking. When they logged it themselves, say so — the proof is their own words.
+export function sayStatus(status, item, tz, asker) {
   const items = item ? status.items.filter(i => i.item === item) : status.items;
   if (!items.length) {
     return item
@@ -54,6 +87,11 @@ export function sayStatus(status, item, tz) {
         + `Could you check with each other? I don't want to guess.`;
     }
     const last = i.evidence[i.evidence.length - 1];
+    const pronoun = PRONOUN[last.subject];
+    if (i.status === 'given' && pronoun && !last.correctedBy) {
+      const by = last.who === asker ? 'You logged it yourself' : `${last.who} logged it`;
+      return `${pronoun} did — ${clock(last.at, tz)} ${partOfDay(last.at, status.asOf, tz)}. ${by}: "${last.said}"`;
+    }
     const corrected = last.correctedBy ? ` (corrected later — ${cite(last.correctedBy, tz)})` : '';
     return `Yes — ${i.item} ${STATUS_WORDS[i.status] || 'is noted'}.${corrected} Source: ${cite(last, tz)}.`
       .replace(/^Yes — (.*) wasn't/, 'Not yet — $1 wasn\'t')

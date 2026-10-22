@@ -158,7 +158,7 @@ export class Ledger {
       };
     });
     const other = events.filter(e => e.kind !== 'med').map(evidence);
-    return { subject, since: since.toISOString(), items, other };
+    return { subject, since: since.toISOString(), asOf: now.toISOString(), items, other };
   }
 
   // Shift handoff: what happened since someone left, as at most three lines plus open questions.

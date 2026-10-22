@@ -2,6 +2,7 @@
 // Bedrock does it when configured; a small rule parser does it otherwise, so the demo runs with no keys.
 // The model only reads language. It never decides whether a dose is allowed — the ledger's rules do.
 import { KNOWN_ITEMS } from './rules.js';
+import { TONE } from '../web/voice.js';
 
 const INTENTS = ['log', 'ask', 'handoff', 'forget_last', 'confirm', 'cancel', 'correct'];
 
@@ -73,7 +74,9 @@ Schema: {"intent": one of ${JSON.stringify(INTENTS)}, "kind": "med"|"meal"|"note
 "subject": who the care is for, e.g. "Dad", "Mom" (when said),
 "tentative": true when it has not happened yet, is only planned or hypothetical, or the medicine is not in the list}.
 "ask" = a question about what happened. "confirm"/"cancel" = yes/no to a pending question.
-Never give medical advice. Never decide whether a dose is safe.`;
+Never give medical advice. Never decide whether a dose is safe.
+If you ever add words for a person to hear, keep this voice — a friendly helper beside the family, not a replacement:
+${TONE.map(l => `- ${l}`).join('\n')}`;
 
 export async function understand(text, { modelId = process.env.BEDROCK_MODEL_ID, region = process.env.AWS_REGION } = {}) {
   if (modelId && process.env.CARE_BRAIN !== 'rules') {

@@ -1,11 +1,13 @@
 // Read-aloud voice picker. Polly voices go through the server's /speak; browser voices (Edge "Natural"
 // ones first) speak locally. The choice, speed and pitch are kept in this browser so a recording keeps one voice.
 const KEY = 'care-voice';
+// A little slower than normal by default: easier to follow on a recording.
+const RATE = 0.9;
 const $ = id => document.getElementById(id);
 
 export function loadChoice(fallback) {
-  try { return { voice: fallback, rate: 1, pitch: 1, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
-  catch { return { voice: fallback, rate: 1, pitch: 1 }; }
+  try { return { voice: fallback, rate: RATE, pitch: 1, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
+  catch { return { voice: fallback, rate: RATE, pitch: 1 }; }
 }
 
 function saveChoice(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch {} }
@@ -42,7 +44,7 @@ export function setupSpeaker(polly) {
   };
   for (const el of [pick, $('rate'), $('pitch')]) el.onchange = sync;
   sync();
-  $('tryVoice').onclick = () => speakWith(choice, "Hi! I'm keeping the family care log.");
+  $('tryVoice').onclick = () => speakWith(choice, "I'm not here to replace anyone. I just keep the family's words.");
   return text => speakWith(choice, text);
 }
 

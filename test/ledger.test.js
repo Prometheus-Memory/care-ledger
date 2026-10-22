@@ -57,7 +57,7 @@ test('evidence: the answer ends with who, when and the exact words', async () =>
   assert.equal(status.items[0].status, 'given');
   assert.equal(
     sayStatus(status, 'blood pressure pill', TZ),
-    'Yes — blood pressure pill was given. Source: Minji, 8:04 AM: "I gave Dad his blood pressure pill".',
+    'He did — 8:04 AM this morning. Minji logged it: "I gave Dad his blood pressure pill"',
   );
 });
 
