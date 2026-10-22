@@ -16,10 +16,10 @@ export function parseByRules(text) {
     return { intent: 'handoff' };
   }
   if (/\b(actually|correction|i was wrong|my mistake)\b/.test(t)) {
-    return { intent: 'correct', item, status: negative(t) ? 'not_given' : 'given' };
+    return { intent: 'correct', item, status: negative(t) ? 'not_given' : 'given', ...subjectOf(t) };
   }
   if (/\?\s*$/.test(text.trim()) || /^ (did|has|have|was|is|when|what|who)\b/.test(t)) {
-    return { intent: 'ask', item };
+    return { intent: 'ask', item, ...subjectOf(t) };
   }
   const who = subjectOf(t);
   if (item || /\b(pill|pills|meds|medicine|medication|dose|drops|tablet|tablets)\b/.test(t)) {

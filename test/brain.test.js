@@ -4,7 +4,7 @@ import { parseByRules } from '../src/brain.js';
 
 const cases = [
   ['I gave Dad his blood pressure pill', { intent: 'log', kind: 'med', item: 'blood pressure pill', status: 'given', subject: 'Dad' }],
-  ['Did Dad take his blood pressure pill?', { intent: 'ask', item: 'blood pressure pill' }],
+  ['Did Dad take his blood pressure pill?', { intent: 'ask', item: 'blood pressure pill', subject: 'Dad' }],
   ['Dad refused his metformin', { intent: 'log', kind: 'med', item: 'metformin', status: 'refused', subject: 'Dad' }],
   ["He didn't take his vitamin", { intent: 'log', kind: 'med', item: 'vitamin d', status: 'not_given' }],
   ['Dad ate lunch', { intent: 'log', kind: 'meal', item: 'lunch', subject: 'Dad' }],
