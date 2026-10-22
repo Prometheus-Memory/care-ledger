@@ -23,17 +23,37 @@ export async function makeStore() {
 }
 
 const CORS = {
-  'Access-Control-Allow-Origin': process.env.CARE_ORIGIN || '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Accept, MCP-Protocol-Version, Mcp-Session-Id, Last-Event-ID',
   'Access-Control-Expose-Headers': 'Mcp-Session-Id, MCP-Protocol-Version',
+  Vary: 'Origin',
 };
+
+// MCP transport rule: validate Origin on every request. Allowed: no Origin (curl, server-side clients),
+// the page's own origin on a loopback host, or an origin listed in CARE_ORIGINS (comma separated).
+// Anything else gets 403 and no data. This is the browser fence only; a real deployment adds auth per household.
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+export function originAllowed(origin, host, extra = process.env.CARE_ORIGINS) {
+  if (!origin) return true;
+  const listed = String(extra || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (listed.includes(origin)) return true;
+  try {
+    const o = new URL(origin);
+    return LOOPBACK.has(o.hostname) && o.host === host;
+  } catch {
+    return false;
+  }
+}
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 
 export function createApp(ledger) {
   return async (req, res) => {
+    const origin = req.headers.origin;
+    if (!originAllowed(origin, req.headers.host)) return json(res, 403, { error: 'origin not allowed' });
     for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
+    if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
     if (req.method === 'OPTIONS') return res.writeHead(204).end();
     const url = new URL(req.url, 'http://local');
     try {
@@ -89,7 +109,8 @@ function json(res, code, obj) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const ledger = new Ledger(await makeStore());
   const port = Number(process.env.PORT || 8787);
-  http.createServer(createApp(ledger)).listen(port, () => {
-    console.log(`Care Ledger on http://localhost:${port}  (MCP endpoint: /mcp, brain: ${process.env.BEDROCK_MODEL_ID ? 'Bedrock ' + process.env.BEDROCK_MODEL_ID : 'rules'})`);
+  const host = process.env.CARE_HOST || '127.0.0.1';
+  http.createServer(createApp(ledger)).listen(port, host, () => {
+    console.log(`Care Ledger on http://${host}:${port}  (MCP endpoint: /mcp, brain: ${process.env.BEDROCK_MODEL_ID ? 'Bedrock ' + process.env.BEDROCK_MODEL_ID : 'rules'})`);
   });
 }

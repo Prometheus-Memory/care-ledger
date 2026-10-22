@@ -1,7 +1,8 @@
 // The web simulator. The browser itself is the MCP client: it speaks JSON-RPC to /mcp over
 // Streamable HTTP and shows every request and response. Only sentence understanding goes to
 // /api/understand, so no cloud key ever reaches the page.
-import { sayLogged, sayStatus, sayHandoff, sayForgot, cite } from './voice.js';
+import { sayLogged, sayStatus, sayHandoff, sayForgot, sayTentative, cite } from './voice.js';
+import { scrubNodes } from './scrub.js';
 
 const PROTOCOL = '2025-11-25';
 const $ = id => document.getElementById(id);
@@ -48,7 +49,7 @@ function parseSse(text) {
 }
 
 // ---- UI ----
-const state = { tz: Intl.DateTimeFormat().resolvedOptions().timeZone, pending: null };
+const state = { tz: Intl.DateTimeFormat().resolvedOptions().timeZone, pending: null, subject: 'Dad' };
 
 function logLine(dir, payload) {
   const li = document.createElement('li');
@@ -100,8 +101,8 @@ function showCard(title, rows) {
 }
 
 async function statusCard(mcp) {
-  const status = await mcp.call('get_status', { asOf: now() });
-  showCard(`Dad · last 24 hours`, [
+  const status = await mcp.call('get_status', { asOf: now(), subject: state.subject });
+  showCard(`${state.subject} · last 24 hours`, [
     ...status.items.map(i => ({
       text: `${i.item}: ${i.status === 'conflict' ? 'people disagree — please check' : i.status.replace('_', ' ')}`,
       cls: i.status === 'conflict' ? 'conflict' : '',
@@ -120,22 +121,29 @@ async function handle(mcp, text) {
   logLine('🧠', `understood (${intent.engine}): ${JSON.stringify({ ...intent, engine: undefined })}`);
 
   if (state.pending && (intent.intent === 'confirm' || intent.intent === 'cancel')) {
-    const pending = state.pending; state.pending = null;
+    const { args, step } = state.pending; state.pending = null;
     if (intent.intent === 'cancel') return answer("Okay, I won't log it. Thanks for double-checking.");
-    const res = await mcp.call('log_event', { ...pending, confirmRepeat: true });
-    answer(sayLogged(res, state.tz));
+    // A "yes" to an unsure sentence still goes through the repeat check; only a "yes" to that check overrides it.
+    const res = await mcp.call('log_event', step === 'repeat' ? { ...args, confirmRepeat: true } : args);
+    if (res.needsConfirmation) state.pending = { args, step: 'repeat' };
+    answer(args.kind === 'correction' && res.logged ? sayCorrected() : sayLogged(res, state.tz), res.needsConfirmation ? 'ask' : '');
     return statusCard(mcp);
   }
   state.pending = null;
   if (intent.intent === 'confirm' || intent.intent === 'cancel') return answer('Okay! Anything else I can note for you?');
+  if (intent.subject) state.subject = intent.subject;
 
   switch (intent.intent) {
     case 'log': {
-      const args = { who: who(), text, kind: intent.kind || 'note', at: now() };
+      const args = { who: who(), text, kind: intent.kind || 'note', subject: state.subject, at: now() };
       if (intent.item) args.item = intent.item;
       if (intent.kind === 'med') args.status = intent.status || 'given';
+      if (intent.tentative) {
+        state.pending = { args: { ...args, item: args.item || 'unlisted medicine' }, step: 'unsure' };
+        return answer(sayTentative({ ...intent, subject: state.subject }), 'ask');
+      }
       const res = await mcp.call('log_event', args);
-      if (res.needsConfirmation) state.pending = args;
+      if (res.needsConfirmation) state.pending = { args, step: 'repeat' };
       answer(sayLogged(res, state.tz), res.needsConfirmation ? 'ask' : '');
       return statusCard(mcp);
     }
@@ -144,7 +152,7 @@ async function handle(mcp, text) {
       return answer(sayStatus(status, intent.item, state.tz));
     }
     case 'handoff': {
-      const card = await mcp.call('handoff', { asOf: now() });
+      const card = await mcp.call('handoff', { asOf: now(), subject: state.subject });
       showCard('Handoff · since you left', [
         ...card.latest.map(e => ({ text: `${e.who}: "${e.said}"`, src: cite(e, state.tz) })),
         ...card.open.map(o => ({ text: o, cls: 'conflict' })),
@@ -152,24 +160,37 @@ async function handle(mcp, text) {
       return answer(sayHandoff(card, state.tz));
     }
     case 'forget_last': {
-      const status = await mcp.call('get_status', { asOf: now(), hours: 48 });
+      const status = await mcp.call('get_status', { asOf: now(), hours: 48, subject: state.subject });
       const mine = [...status.items.flatMap(i => i.evidence), ...status.other]
         .filter(e => e.who === who()).sort((a, b) => a.at.localeCompare(b.at)).pop();
       if (!mine) return answer("I don't see anything from you to forget.");
-      answer(sayForgot(await mcp.call('forget', { eventId: mine.id, who: who() })));
+      const res = await mcp.call('forget', { eventId: mine.id, who: who() });
+      // The words leave the screen too: chat bubbles, earlier answers, the card and the MCP log.
+      if (res.forgotten) scrubNodes(document.querySelectorAll('#chat .msg, #log li, #card li'), mine.said);
+      answer(sayForgot(res));
       return statusCard(mcp);
     }
     case 'correct': {
-      const status = await mcp.call('get_status', { asOf: now(), item: intent.item });
+      const status = await mcp.call('get_status', { asOf: now(), item: intent.item, subject: state.subject });
       const target = status.items.flatMap(i => i.evidence).pop();
       if (!target) return answer("I couldn't find what to correct. Could you say it again?");
-      await mcp.call('log_event', { who: who(), text, kind: 'correction', corrects: target.id, status: intent.status, at: now() });
-      answer(`Thanks for the correction — I've kept both, and I'll go by yours from now on.`);
+      const args = { who: who(), text, kind: 'correction', corrects: target.id, status: intent.status, subject: state.subject, at: now() };
+      const res = await mcp.call('log_event', args);
+      if (res.needsConfirmation) {
+        state.pending = { args, step: 'repeat' };
+        answer(sayLogged(res, state.tz), 'ask');
+      } else {
+        answer(sayCorrected());
+      }
       return statusCard(mcp);
     }
     default:
       return answer("Sorry, I didn't catch that. Could you say it another way?");
   }
+}
+
+function sayCorrected() {
+  return "Thanks for the correction — I've kept both, and I'll go by yours from now on.";
 }
 
 function setClock(spec) {

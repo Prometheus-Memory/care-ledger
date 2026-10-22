@@ -11,7 +11,8 @@ export function buildMcpServer(ledger) {
   server.registerTool('log_event', {
     title: 'Log a care event',
     description: 'Append what a family member said happened (medicine, meal, note, or a correction). '
-      + 'Medicine marked "given" passes the repeat guard first; if blocked, nothing is written until confirmRepeat is true.',
+      + 'Medicine marked "given" (or a correction to "given") passes the repeat check first; if held, nothing is written until confirmRepeat is true. '
+      + 'Only log what already happened, for the person named in the sentence; ask first when unsure.',
     inputSchema: {
       who: z.string().describe('Person speaking'),
       text: z.string().describe('Their exact words'),
@@ -19,7 +20,7 @@ export function buildMcpServer(ledger) {
       item: z.string().optional().describe('Medicine or meal name'),
       status: z.enum(['given', 'not_given', 'refused']).optional(),
       corrects: z.string().optional().describe('Event id this corrects (kind=correction)'),
-      subject,
+      subject: z.string().describe('Who the care is for, as said (e.g. "Dad", "Mom"); no default'),
       at: z.string().optional().describe('ISO time it happened; default now'),
       confirmRepeat: z.boolean().optional(),
     },
@@ -34,7 +35,8 @@ export function buildMcpServer(ledger) {
 
   server.registerTool('check_repeat', {
     title: 'Check for a repeat dose',
-    description: 'Deterministic interval rule: would recording this medicine now be a second dose inside its window?',
+    description: 'Deterministic check on the sample ledger: is a "given" record for this item already inside its check window? '
+      + 'It is a "was it already given?" prompt, not dosing advice.',
     inputSchema: { item: z.string(), subject, at: z.string().optional() },
   }, async args => reply(await ledger.checkRepeat(args)));
 

@@ -29,7 +29,7 @@ test('MCP over Streamable HTTP: initialize, tools/list, tools/call', async () =>
     assert.equal(init.serverInfo.name, 'care-ledger');
     const { tools } = await rpc(url, 'tools/list');
     assert.deepEqual(tools.map(t => t.name).sort(), ['check_repeat', 'forget', 'get_status', 'handoff', 'log_event']);
-    const first = await rpc(url, 'tools/call', { name: 'log_event', arguments: { who: 'Minji', text: 'gave bp pill', kind: 'med', item: 'blood pressure pill', at: '2026-10-22T08:04:00Z' } });
+    const first = await rpc(url, 'tools/call', { name: 'log_event', arguments: { who: 'Minji', text: 'gave bp pill', kind: 'med', item: 'blood pressure pill', subject: 'Dad', at: '2026-10-22T08:04:00Z' } });
     assert.equal(first.structuredContent.logged, true);
     const again = await rpc(url, 'tools/call', { name: 'check_repeat', arguments: { item: 'blood pressure pill', at: '2026-10-22T19:10:00Z' } });
     assert.equal(again.structuredContent.blocked, true);

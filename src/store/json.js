@@ -1,7 +1,14 @@
 // Local store: one JSON-lines file. Lines are only ever appended; scrub() is the single exception,
 // and it only blanks the words of a forgotten event.
+// append() refuses a seq that already exists, like the DynamoDB condition, so a clash is retried, never lost.
 import fs from 'node:fs';
 import path from 'node:path';
+
+export function seqTaken(seq) {
+  const err = new Error(`seq ${seq} already exists`);
+  err.name = 'ConditionalCheckFailedException';
+  return err;
+}
 
 export class JsonStore {
   constructor(file) {
@@ -20,6 +27,7 @@ export class JsonStore {
   }
 
   async append(event) {
+    if ((await this.list()).some(e => e.seq === event.seq)) throw seqTaken(event.seq);
     fs.appendFileSync(this.file, JSON.stringify(event) + '\n');
   }
 
@@ -33,7 +41,12 @@ export class MemoryStore {
   constructor() { this.events = []; }
   async list() { return this.events.map(e => ({ ...e })); }
   async maxSeq() { return this.events.reduce((m, e) => Math.max(m, e.seq), 0); }
-  async append(event) { this.events.push({ ...event }); }
+  async append(event) {
+    // Yield once, so two ledgers sharing this store can really race (as two servers would on DynamoDB).
+    await null;
+    if (this.events.some(e => e.seq === event.seq)) throw seqTaken(event.seq);
+    this.events.push({ ...event });
+  }
   async scrub(id) {
     this.events = this.events.map(e => (e.id === id ? { ...e, text: '[forgotten]', scrubbed: true } : e));
   }

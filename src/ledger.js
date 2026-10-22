@@ -12,6 +12,14 @@ export class Ledger {
   constructor(store, { now = () => new Date() } = {}) {
     this.store = store;
     this.now = now;
+    this.queue = Promise.resolve();
+  }
+
+  // Writes on one ledger run one at a time: check → number → append is never interleaved.
+  serial(fn) {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.catch(() => {});
+    return run;
   }
 
   async all() {
@@ -20,12 +28,14 @@ export class Ledger {
   }
 
   // Events that still count: forgotten ones drop out, corrected ones take the correction's status.
-  async effective() {
+  // With asOf, only corrections made by then apply (a forget always applies: the words are gone).
+  async effective({ asOf } = {}) {
+    const cut = asOf ? new Date(asOf) : undefined;
     const events = await this.all();
     const forgotten = new Set(events.filter(e => e.kind === 'forget').map(e => e.forgets));
     const live = events.filter(e => !forgotten.has(e.id) && e.kind !== 'forget');
     const corrections = new Map();
-    for (const e of live) if (e.kind === 'correction') corrections.set(e.corrects, e);
+    for (const e of live) if (e.kind === 'correction' && (!cut || new Date(e.at) <= cut)) corrections.set(e.corrects, e);
     return live
       .filter(e => e.kind !== 'correction')
       .map(e => {
@@ -59,13 +69,14 @@ export class Ledger {
     return event;
   }
 
-  // The double-dose guard. Pure rule: same item, status "given", inside the rule's window.
-  async checkRepeat({ item, subject = 'Dad', at }) {
+  // The repeat check. Pure rule: same item, status "given", inside the sample ledger's check window.
+  // It only asks "is this already in the log?" — it says nothing about when a dose is safe.
+  async checkRepeat({ item, subject = 'Dad', at, exclude }) {
     const when = at ? new Date(at) : this.now();
     const rule = ruleFor(item);
     const key = normalizeItem(item);
     const given = (await this.effective())
-      .filter(e => e.kind === 'med' && e.item === key && e.subject === subject && e.status === 'given')
+      .filter(e => e.kind === 'med' && e.item === key && e.subject === subject && e.status === 'given' && e.id !== exclude)
       .filter(e => new Date(e.at) <= when)
       .sort((a, b) => new Date(b.at) - new Date(a.at));
     const last = given[0];
@@ -77,18 +88,28 @@ export class Ledger {
       item: key,
       rule,
       hoursSince: Math.round(hoursSince * 10) / 10,
-      nextAllowedAt: new Date(new Date(last.at).getTime() + rule.minHours * HOUR).toISOString(),
       previous: evidence(last),
     };
   }
 
-  // Log with the guard in front. A blocked dose is not written unless a person confirms.
-  async logEvent(fields) {
-    if (fields.kind === 'med' && (fields.status || 'given') === 'given') {
-      const check = await this.checkRepeat({ item: fields.item, subject: fields.subject, at: fields.at });
-      if (check.blocked && !fields.confirmRepeat) {
-        return { logged: false, needsConfirmation: true, check };
+  // Log with the check in front. A repeat is not written unless a person confirms.
+  // Serialized per ledger; if another server took the same seq (store condition), look again and retry.
+  logEvent(fields) {
+    return this.serial(async () => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await this.logOnce(fields);
+        } catch (err) {
+          if (err.name !== 'ConditionalCheckFailedException' || attempt >= 4) throw err;
+        }
       }
+    });
+  }
+
+  async logOnce(fields) {
+    const check = await this.repeatFor(fields);
+    if (check) {
+      if (check.blocked && !fields.confirmRepeat) return { logged: false, needsConfirmation: true, check };
       const event = await this.append({ ...fields, override: check.blocked ? 'confirmed-repeat' : undefined });
       return { logged: true, event: evidence(event), check };
     }
@@ -96,12 +117,26 @@ export class Ledger {
     return { logged: true, event: evidence(event) };
   }
 
+  // What a write would make "given": a new med record, or a correction that turns one into given.
+  async repeatFor(fields) {
+    if (fields.kind === 'med' && (fields.status || 'given') === 'given') {
+      return this.checkRepeat({ item: fields.item, subject: fields.subject, at: fields.at });
+    }
+    if (fields.kind === 'correction' && fields.status === 'given') {
+      const target = (await this.effective()).find(e => e.id === fields.corrects);
+      if (target?.kind === 'med' && target.status !== 'given') {
+        return this.checkRepeat({ item: target.item, subject: target.subject, at: target.at, exclude: target.id });
+      }
+    }
+    return null;
+  }
+
   // Current state of one item (or everything) for today, with the raw words behind it.
   async getStatus({ item, subject = 'Dad', hours = 24, asOf } = {}) {
     const now = asOf ? new Date(asOf) : this.now();
     const since = new Date(now.getTime() - hours * HOUR);
     const key = item ? normalizeItem(item) : undefined;
-    const events = (await this.effective())
+    const events = (await this.effective({ asOf: now }))
       .filter(e => e.subject === subject && new Date(e.at) >= since && new Date(e.at) <= now)
       .filter(e => !key || e.item === key)
       .sort((a, b) => new Date(a.at) - new Date(b.at));
@@ -130,13 +165,15 @@ export class Ledger {
   async handoff({ since, subject = 'Dad', asOf } = {}) {
     const now = asOf ? new Date(asOf) : this.now();
     const from = since ? new Date(since) : new Date(now.getTime() - 24 * HOUR);
-    const events = (await this.effective())
+    const live = await this.effective({ asOf: now });
+    const events = live
       .filter(e => e.subject === subject && new Date(e.at) >= from && new Date(e.at) <= now)
       .sort((a, b) => new Date(b.at) - new Date(a.at));
     const status = await this.getStatus({ subject, hours: (now - from) / HOUR, asOf: now.toISOString() });
     const open = [
       ...status.items.filter(i => i.status === 'conflict').map(i => `Conflicting reports on ${i.item}`),
-      ...events.filter(e => e.override).map(e => `${e.who} confirmed a repeat ${e.item}`),
+      ...events.filter(confirmedRepeat).map(e => `${(e.correctedBy?.override ? e.correctedBy : e).who} confirmed a repeat ${e.item}`),
+      ...repeatsIn(live, events),
     ];
     return {
       since: from.toISOString(),
@@ -148,14 +185,35 @@ export class Ledger {
 
   // Forget: append a forget event, then scrub the original words from storage.
   // Nothing derived is cached, so every later answer already excludes it.
-  async forget({ eventId, who }) {
-    const events = await this.all();
-    const target = events.find(e => e.id === eventId);
-    if (!target) return { forgotten: false, reason: 'no such event' };
-    await this.append({ who, kind: 'forget', forgets: eventId, text: `forget ${eventId}` });
-    await this.store.scrub(eventId);
-    return { forgotten: true, eventId };
+  forget({ eventId, who }) {
+    return this.serial(async () => {
+      const events = await this.all();
+      const target = events.find(e => e.id === eventId);
+      if (!target) return { forgotten: false, reason: 'no such event' };
+      await this.append({ who, kind: 'forget', forgets: eventId, text: `forget ${eventId}` });
+      await this.store.scrub(eventId);
+      return { forgotten: true, eventId };
+    });
   }
+}
+
+function confirmedRepeat(e) {
+  return Boolean(e.override || e.correctedBy?.override);
+}
+
+// Two effective "given" records for one item inside its check window that nobody confirmed as a repeat
+// (written before the check existed, or by another client). Flag them; never drop either.
+function repeatsIn(live, shown) {
+  const out = [];
+  for (const e of shown) {
+    if (e.kind !== 'med' || e.status !== 'given' || confirmedRepeat(e)) continue;
+    const rule = ruleFor(e.item);
+    const earlier = live.find(p => p !== e && p.kind === 'med' && p.status === 'given' && p.item === e.item
+      && p.subject === e.subject && (new Date(p.at) < new Date(e.at) || (p.at === e.at && p.seq < e.seq))
+      && (new Date(e.at) - new Date(p.at)) / HOUR < rule.minHours);
+    if (earlier) out.push(`Two "given" records for ${e.item} within ${rule.minHours} h (${earlier.who} and ${e.who}) — please check`);
+  }
+  return out;
 }
 
 export function evidence(e) {
@@ -165,6 +223,7 @@ export function evidence(e) {
     at: e.at,
     said: e.text,
     kind: e.kind,
+    subject: e.subject,
     item: e.item,
     status: e.status,
     ...(e.override ? { override: e.override } : {}),

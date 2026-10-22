@@ -18,14 +18,26 @@ const STATUS_WORDS = {
 export function sayLogged(res, tz) {
   if (res.needsConfirmation) {
     const p = res.check.previous;
-    return `Just a heads-up — ${p.item} is already in the log today. ${cite(p, tz)}. `
-      + `It's usually ${res.check.rule.label}. Do you still want me to record another one? You decide.`;
+    return `Just a heads-up — ${p.item} is already in the log as given. ${cite(p, tz)}. `
+      + `Could you double-check it wasn't already given? Want me to record another one anyway? You decide.`;
   }
   const e = res.event;
   if (e.override) return `Okay, I've noted a second ${e.item} at your say-so. I'll flag it for whoever's next.`;
   if (e.kind === 'med') return `Got it — ${e.item} ${STATUS_WORDS[e.status] || 'noted'}. Thanks for keeping track.`;
   if (e.kind === 'meal') return `Noted — ${e.item}. Thank you.`;
   return "Thanks, I've written that down.";
+}
+
+// Before writing something unsure: it hasn't happened yet, or the medicine isn't one this ledger knows.
+export function sayTentative(intent) {
+  const whom = intent.subject || 'them';
+  if (intent.reason === 'not_yet') {
+    return `Sounds like that's still coming up, so I haven't logged it. Tell me once ${whom} has had it — `
+      + `or say "yes" if it's already done and I'll note it now.`;
+  }
+  const what = intent.item ? `"${intent.item}"` : "that medicine";
+  return `I don't have ${what} on my list yet, so I want to get it right. `
+    + `Did ${whom} already have it? Say "yes" and I'll note it just as you said it.`;
 }
 
 export function sayStatus(status, item, tz) {
