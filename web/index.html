@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Care Ledger</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Care Ledger <span class="sub">family care log for Alexa+ · simulator</span></h1>
+  <div class="clock">
+    <label>Simulated time <input id="clock" type="datetime-local"></label>
+    <button data-time="08:04">8:04 AM</button>
+    <button data-time="19:10">7:10 PM</button>
+    <button data-time="next-09:00">Next day 9 AM</button>
+  </div>
+</header>
+<main>
+  <section class="device" aria-label="Voice assistant">
+    <div class="speaker-row">
+      <label>Who's talking
+        <select id="speaker">
+          <option>Minji</option><option>Joon</option><option>Ana (carer)</option>
+        </select>
+      </label>
+      <span id="brain" class="pill">brain: …</span>
+    </div>
+    <div id="chat" class="chat" aria-live="polite"></div>
+    <form id="say">
+      <button type="button" id="mic" title="Hold to speak">🎤</button>
+      <input id="text" autocomplete="off" placeholder='Try: "I gave Dad his blood pressure pill"'>
+      <button>Say</button>
+    </form>
+    <label class="speak"><input type="checkbox" id="speakOut" checked> Read answers aloud</label>
+    <div id="card" class="card" hidden></div>
+  </section>
+  <section class="dev" aria-label="MCP traffic">
+    <h2>MCP traffic <span class="sub">browser → <code>/mcp</code> · Streamable HTTP · 2025-11-25</span></h2>
+    <ol id="log" class="log"></ol>
+  </section>
+</main>
+<footer>A record-keeping helper, not medical advice. Decisions stay with the family and their clinicians.</footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>

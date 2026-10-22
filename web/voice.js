@@ -1,7 +1,7 @@
 // What the assistant says back. Warm and short; every factual answer ends with its evidence
 // (who, when, their words). When people disagree it says both and asks. It never gives medical advice.
 
-export function clock(iso, tz = 'America/Los_Angeles') {
+export function clock(iso, tz) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
 }
 
@@ -51,7 +51,7 @@ export function sayStatus(status, item, tz) {
 
 export function sayHandoff(card, tz) {
   if (!card.count) return "Quiet shift — nothing new since you left.";
-  const lines = card.lines.join(' Then, ');
+  const lines = card.latest.map(e => cite(e, tz)).join('. Before that, ');
   const open = card.open.length ? ` One thing to look at: ${card.open.join('; ')}.` : '';
   return `Welcome back. ${card.count} update${card.count > 1 ? 's' : ''} since you left. Most recent: ${lines}.${open}`;
 }

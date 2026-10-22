@@ -136,12 +136,12 @@ export class Ledger {
     const status = await this.getStatus({ subject, hours: (now - from) / HOUR, asOf: now.toISOString() });
     const open = [
       ...status.items.filter(i => i.status === 'conflict').map(i => `Conflicting reports on ${i.item}`),
-      ...events.filter(e => e.override).map(e => `${e.who} confirmed a repeat ${e.item} at ${clock(e.at)}`),
+      ...events.filter(e => e.override).map(e => `${e.who} confirmed a repeat ${e.item}`),
     ];
     return {
       since: from.toISOString(),
       count: events.length,
-      lines: events.slice(0, 3).map(e => `${clock(e.at)} · ${e.who}: "${e.text}"`),
+      latest: events.slice(0, 3).map(evidence),
       open,
     };
   }
@@ -170,11 +170,6 @@ export function evidence(e) {
     ...(e.override ? { override: e.override } : {}),
     ...(e.correctedBy ? { correctedBy: e.correctedBy } : {}),
   };
-}
-
-export function clock(iso) {
-  const tz = process.env.CARE_TZ || 'America/Los_Angeles';
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
 }
 
 function required(v, name) {

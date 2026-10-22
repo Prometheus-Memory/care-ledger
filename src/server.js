@@ -43,7 +43,7 @@ export function createApp(ledger) {
         return json(res, 200, await understand(String(text || '')));
       }
       if (url.pathname === '/api/config') {
-        return json(res, 200, { tz: process.env.CARE_TZ || 'America/Los_Angeles', brain: process.env.BEDROCK_MODEL_ID ? 'bedrock' : 'rules' });
+        return json(res, 200, { brain: process.env.BEDROCK_MODEL_ID ? 'bedrock' : 'rules' });
       }
       if (req.method === 'GET') return serveStatic(url.pathname, res);
       json(res, 404, { error: 'not found' });
