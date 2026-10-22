@@ -8,8 +8,9 @@ const INTENTS = ['log', 'ask', 'handoff', 'forget_last', 'confirm', 'cancel', 'c
 export function parseByRules(text) {
   const t = ` ${text.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]/g, ' ')} `.replace(/\s+/g, ' ');
   const item = findItem(t);
-  if (/^ (yes|yeah|yep|ok|okay|sure|confirm|go ahead|log it)\b/.test(t)) return { intent: 'confirm' };
-  if (/^ (no|nope|cancel|never mind|don't|stop)\b/.test(t)) return { intent: 'cancel' };
+  const short = t.trim().split(' ').length <= 4;
+  if (short && /^ (yes|yeah|yep|ok|okay|sure|confirm|go ahead|log it)\b/.test(t)) return { intent: 'confirm' };
+  if (short && /^ (no|nope|cancel|never mind|don't|stop)\b/.test(t)) return { intent: 'cancel' };
   if (/\b(forget|delete|erase|scratch) (that|the last|my last|it)\b/.test(t)) return { intent: 'forget_last' };
   if (/\b(handoff|hand off|catch me up|what did i miss|what happened (since|while)|shift (note|summary))\b/.test(t)) {
     return { intent: 'handoff' };

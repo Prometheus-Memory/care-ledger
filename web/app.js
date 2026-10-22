@@ -127,6 +127,7 @@ async function handle(mcp, text) {
     return statusCard(mcp);
   }
   state.pending = null;
+  if (intent.intent === 'confirm' || intent.intent === 'cancel') return answer('Okay! Anything else I can note for you?');
 
   switch (intent.intent) {
     case 'log': {

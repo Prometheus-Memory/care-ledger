@@ -129,7 +129,7 @@ export class Ledger {
   // Shift handoff: what happened since someone left, as at most three lines plus open questions.
   async handoff({ since, subject = 'Dad', asOf } = {}) {
     const now = asOf ? new Date(asOf) : this.now();
-    const from = since ? new Date(since) : new Date(now.getTime() - 12 * HOUR);
+    const from = since ? new Date(since) : new Date(now.getTime() - 24 * HOUR);
     const events = (await this.effective())
       .filter(e => e.subject === subject && new Date(e.at) >= from && new Date(e.at) <= now)
       .sort((a, b) => new Date(b.at) - new Date(a.at));

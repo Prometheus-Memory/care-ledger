@@ -40,7 +40,7 @@ export function buildMcpServer(ledger) {
 
   server.registerTool('handoff', {
     title: 'Shift handoff card',
-    description: 'What happened since a time (default last 12 hours): up to three lines with exact words, plus open questions.',
+    description: 'What happened since a time (default last 24 hours): up to three lines with exact words, plus open questions.',
     inputSchema: { since: z.string().optional(), subject, asOf },
   }, async args => reply(await ledger.handoff(args)));
 

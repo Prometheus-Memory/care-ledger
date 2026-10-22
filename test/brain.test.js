@@ -13,6 +13,7 @@ const cases = [
   ['No, never mind', { intent: 'cancel' }],
   ['Forget that', { intent: 'forget_last' }],
   ["Actually he didn't take the blood pressure pill", { intent: 'correct', item: 'blood pressure pill', status: 'not_given' }],
+  ['Okay, I gave Dad his blood pressure pill', { intent: 'log', kind: 'med', item: 'blood pressure pill', status: 'given' }],
   ['He seems a bit tired today', { intent: 'log', kind: 'note' }],
 ];
 
