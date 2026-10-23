@@ -163,11 +163,11 @@ async function main() {
   npmScript('reset'); npmScript('seed');
 
   const browser = await chromium.launch({
-    headless: false, channel: process.env.DEMO_BROWSER || 'chrome',
+    headless: false, args: process.env.DEMO_DARK_UI ? ['--force-dark-mode'] : [], channel: process.env.DEMO_BROWSER || 'chrome',
     args: ['--window-size=1600,900', '--window-position=0,0', '--autoplay-policy=no-user-gesture-required'],
     ignoreDefaultArgs: ['--mute-audio'],
   });
-  const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const context = await browser.newContext({ colorScheme: process.env.DEMO_SCHEME || 'dark', viewport: { width: 1600, height: 900 } });
   await context.addInitScript(speechProbe);
   await context.addInitScript(() => localStorage.setItem('care-voice', JSON.stringify({ voice: 'polly:Joanna', rate: 0.9, pitch: 1 })));
   const page = await context.newPage();
